@@ -153,6 +153,17 @@ function createGalleryItem(data) {
     img.onload = () => {
         div.classList.add('loaded');
     };
+    
+    img.onerror = () => {
+        // Even if image fails to load, mark as loaded to remove placeholder
+        div.classList.add('loaded');
+        // Optionally, we could add an error indicator
+        img.style.backgroundColor = '#333';
+        img.style.display = 'flex';
+        img.style.alignItems = 'center';
+        img.style.justifyContent = 'center';
+        img.textContent = '加载失败';
+    };
 
     // Overlay
     const overlay = document.createElement('div');
