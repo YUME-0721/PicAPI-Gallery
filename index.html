@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>绮想絵廊 - Dreamscape Gallery</title>
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="assets/css/style.css">
+
+    <!-- Meta tags for SEO and Sharing -->
+    <meta name="description"
+        content="A curated collection of fine art photography displayed in a premium masonry gallery.">
+    <meta property="og:title" content="Capturing Light & Shadow">
+    <meta property="og:description"
+        content="Explore our curated collection of fine art photography in a cinematic experience.">
+    <meta name="theme-color" content="#050505">
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo">
+            绮想<span>絵廊</span>
+        </div>
+        <div class="nav-right">
+            <a href="https://github.com/YUME-0721/PicAPI-Gallery" target="_blank" rel="noopener" class="github-link">
+            <img src="assets/akar-icons--github-fill.svg" alt="GitHub" class="github-icon">
+        </a>
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">全部</button>
+                <button class="filter-btn" data-filter="h">横屏</button>
+                <button class="filter-btn" data-filter="v">竖屏</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <section class="hero">
+            <h1>入此回廊 <span>皆成绮想</span></h1>
+            <p>4000余张精选二次元图片 <br>设计用来展示、提供二次元图片API接口</p>
+        </section>
+
+        <div class="gallery-container">
+            <div class="gallery-grid" id="gallery-grid">
+                <!-- Gallery items will be injected here by JS -->
+            </div>
+
+            <div class="loader-container" id="loader">
+                <div class="spinner"></div>
+            </div>
+
+            <div class="end-message" id="end-message">
+                You've reached the end of the collection.
+            </div>
+        </div>
+    </main>
+
+    <!-- Lightbox Overlay -->
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" id="lightbox-close">&times;</button>
+        <div class="lightbox-content">
+            <img src="" alt="Full view" class="lightbox-img" id="lightbox-img">
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+
+</html>
