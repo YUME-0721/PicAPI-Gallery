@@ -3,7 +3,7 @@
 const CONFIG = {
     totalHorizontal: 882,
     totalVertical: 3289,
-    batchSize: 30,
+    batchSize: 20, // 进一步减少批量加载数量，提升初始加载速度
     pathH: '/ri/h/',
     pathV: '/ri/v/'
 };
@@ -15,7 +15,11 @@ let state = {
     loadedCount: 0,
     currentMode: 'all', // 'all', 'h', 'v'
     isLoading: false,
-    hasMore: true
+    hasMore: true,
+    loadingImages: 0, // 当前正在加载的图片数量
+    maxConcurrentLoads: 30, // 增加并发加载数量，提升加载速度
+    columns: [], // 瀑布流列元素
+    columnHeights: [] // 每列的当前高度
 };
 
 // Elements
@@ -32,9 +36,20 @@ const dom = {
 // --- Initialization ---
 
 function init() {
+    console.log('Initializing...');
+    
+    // 确保 DOM 元素存在
+    if (!dom.grid) {
+        console.error('Gallery grid element not found');
+        return;
+    }
+
     generateImageList();
     shuffleImages(state.images);
     state.visibleImages = [...state.images]; // Start with all
+
+    // Initialize masonry columns
+    initColumns();
 
     // Setup event listeners
     setupFilters();
@@ -46,6 +61,11 @@ function init() {
 
     // Scroll-aware Navbar
     setupScrollNavbar();
+
+    // Setup resize handler
+    window.addEventListener('resize', handleResize);
+    
+    console.log('Initialization complete');
 }
 
 function setupScrollNavbar() {
@@ -103,9 +123,16 @@ function shuffleImages(array) {
 function loadMoreImages() {
     if (state.isLoading || !state.hasMore) return;
 
+    // 确保列已经初始化
+    if (state.columns.length === 0) {
+        console.error('Columns not initialized');
+        initColumns();
+    }
+
     state.isLoading = true;
     dom.loader.classList.add('active');
 
+    const columnCount = state.columns.length;
     const nextBatch = state.visibleImages.slice(state.loadedCount, state.loadedCount + CONFIG.batchSize);
 
     if (nextBatch.length === 0) {
@@ -116,54 +143,102 @@ function loadMoreImages() {
         return;
     }
 
-    // Create a fragment for performance
-    const fragment = document.createDocumentFragment();
-
-    nextBatch.forEach(imgData => {
+    // 按行加载图片
+    for (let i = 0; i < nextBatch.length; i++) {
+        const imgData = nextBatch[i];
         const item = createGalleryItem(imgData);
-        fragment.appendChild(item);
-    });
+        
+        // 按顺序分配到列中，实现一行一行加载
+        const columnIndex = i % columnCount;
+        const column = state.columns[columnIndex];
+        if (column) {
+            column.appendChild(item);
 
-    dom.grid.appendChild(fragment);
+            // Update column height when image loads
+            const img = item.querySelector('img');
+            img.onload = function() {
+                state.loadingImages--;
+                item.classList.add('loaded');
+                
+                // Update column height
+                state.columnHeights[columnIndex] = column.offsetHeight;
+                
+                // 图片加载完成后淡入显示
+                setTimeout(() => {
+                    item.classList.remove('opacity-0');
+                }, 100);
+            };
 
-    state.loadedCount += nextBatch.length;
-    state.isLoading = false;
-    dom.loader.classList.remove('active');
+            img.onerror = function() {
+                state.loadingImages--;
+                // Even if image fails to load, mark as loaded to remove placeholder
+                item.classList.add('loaded');
+                item.classList.remove('opacity-0');
+                // Optionally, we could add an error indicator
+                img.style.backgroundColor = '#333';
+                img.style.display = 'flex';
+                img.style.alignItems = 'center';
+                img.style.justifyContent = 'center';
+                img.textContent = '加载失败';
+                
+                // Update column height
+                state.columnHeights[columnIndex] = column.offsetHeight;
+            };
+        } else {
+            console.error('Column not found at index:', columnIndex);
+        }
+    }
 
-    // Check if we already exhausted the list
-    if (state.loadedCount >= state.visibleImages.length) {
-        state.hasMore = false;
-        dom.endMessage.style.display = 'block';
+    // 延迟更新加载状态，确保图片有足够时间开始加载
+    setTimeout(() => {
+        state.loadedCount += nextBatch.length;
+        state.isLoading = false;
+        dom.loader.classList.remove('active');
+
+        // 设置 gallery-grid 为 ready 状态，触发淡入效果
+        if (state.loadedCount > 0) {
+            dom.grid.dataset.ready = 'true';
+        }
+
+        // Check if we already exhausted the list
+        if (state.loadedCount >= state.visibleImages.length) {
+            state.hasMore = false;
+            dom.endMessage.style.display = 'block';
+        }
+    }, 100);
+
+    // 如果还有更多图片且加载器可见，继续加载
+    if (state.hasMore) {
+        const rect = dom.loader.getBoundingClientRect();
+        if (rect.top < window.innerHeight + 600) {
+            // 使用 setTimeout 避免堆栈过深，并允许 UI 刷新
+            setTimeout(() => loadMoreImages(), 50);
+        }
     }
 }
 
 function createGalleryItem(data) {
     const div = document.createElement('div');
-    div.className = 'gallery-item';
-
-    // Pre-calculate aspect ratio class? 
-    // Since we don't know the exact dimensions of every image without loading, 
-    // masonry handles the height naturally.
+    div.className = 'gallery-item opacity-0'; // 初始隐藏，用于淡入效果
 
     const img = document.createElement('img');
     img.loading = 'lazy'; // Native lazy loading
-    img.src = data.url;
+    img.decoding = 'async'; // 异步解码，提升性能
     img.alt = `Gallery Image ${data.type.toUpperCase()} ${data.id}`;
 
-    img.onload = () => {
-        div.classList.add('loaded');
+    // 控制并发加载
+    const loadImage = () => {
+        if (state.loadingImages < state.maxConcurrentLoads) {
+            state.loadingImages++;
+            img.src = data.url;
+        } else {
+            // 等待更短的时间后重试，提升加载速度
+            setTimeout(loadImage, 50);
+        }
     };
     
-    img.onerror = () => {
-        // Even if image fails to load, mark as loaded to remove placeholder
-        div.classList.add('loaded');
-        // Optionally, we could add an error indicator
-        img.style.backgroundColor = '#333';
-        img.style.display = 'flex';
-        img.style.alignItems = 'center';
-        img.style.justifyContent = 'center';
-        img.textContent = '加载失败';
-    };
+    // 立即尝试加载
+    loadImage();
 
     // Overlay
     const overlay = document.createElement('div');
@@ -207,8 +282,8 @@ function applyFilter(mode) {
     state.hasMore = true;
     dom.endMessage.style.display = 'none';
 
-    // Clear grid
-    dom.grid.innerHTML = '';
+    // Reinitialize columns
+    initColumns();
 
     // Filter data
     if (mode === 'all') {
@@ -255,6 +330,66 @@ function closeLightbox() {
     document.body.style.overflow = '';
 }
 
+// --- Masonry Layout --- 
+
+function initColumns() {
+    // Clear existing columns
+    state.columns = [];
+    state.columnHeights = [];
+    dom.grid.innerHTML = '';
+
+    // Determine number of columns based on screen width
+    const columnCount = getColumnCount();
+    console.log('Creating', columnCount, 'columns');
+
+    // Create columns
+    for (let i = 0; i < columnCount; i++) {
+        const column = document.createElement('div');
+        column.className = 'gallery-column';
+        dom.grid.appendChild(column);
+        state.columns.push(column);
+        state.columnHeights.push(0);
+        console.log('Created column', i);
+    }
+    console.log('Columns created:', state.columns.length);
+}
+
+function getColumnCount() {
+    const width = window.innerWidth;
+    console.log('Window width:', width);
+    if (width >= 1600) return 5;
+    if (width >= 1200) return 4;
+    if (width >= 800) return 3;
+    if (width >= 500) return 2;
+    return 1;
+}
+
+function handleResize() {
+    // Only reinitialize if column count changes
+    const currentColumnCount = state.columns.length;
+    const newColumnCount = getColumnCount();
+
+    if (currentColumnCount !== newColumnCount) {
+        // Save current images
+        const currentImages = state.visibleImages;
+        const currentMode = state.currentMode;
+
+        // Reinitialize
+        initColumns();
+        state.visibleImages = currentImages;
+        state.currentMode = currentMode;
+        state.loadedCount = 0;
+        state.hasMore = true;
+
+        // Reload images
+        loadMoreImages();
+    }
+}
+
+function getShortestColumnIndex() {
+    return state.columnHeights.indexOf(Math.min(...state.columnHeights));
+}
+
 // --- Infinite Scroll ---
 function setupInfiniteScroll() {
     const observer = new IntersectionObserver((entries) => {
@@ -263,11 +398,15 @@ function setupInfiniteScroll() {
             loadMoreImages();
         }
     }, {
-        rootMargin: '200px' // Load before reaching bottom
+        rootMargin: '600px 0px' // 增加预加载距离，提升用户体验
     });
 
     observer.observe(dom.loader); // Observe the loader element at bottom
 }
 
 // Run
-document.addEventListener('DOMContentLoaded', init);
+console.log('Script loaded');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded event fired');
+    init();
+});

@@ -105,6 +105,8 @@ body {
     border: 1px solid var(--glass-border);
 }
 
+
+
 .filter-btn {
     background: transparent;
     border: none;
@@ -172,37 +174,55 @@ body {
 }
 
 .gallery-grid {
-    column-count: 5;
-    column-gap: 20px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 20px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.gallery-grid[data-ready="true"] {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.gallery-column {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px;
 }
 
 /* Responsive Columns */
 @media (max-width: 1600px) {
     .gallery-grid {
-        column-count: 4;
+        max-width: 1400px;
+        margin: 0 auto;
     }
 }
 
 @media (max-width: 1200px) {
     .gallery-grid {
-        column-count: 3;
+        gap: 15px;
     }
 }
 
 @media (max-width: 800px) {
     .gallery-grid {
-        column-count: 2;
-    }
-}
-
-@media (max-width: 500px) {
-    .gallery-grid {
-        column-count: 1;
+        gap: 10px;
     }
 }
 
 .gallery-item {
-    break-inside: avoid;
     margin-bottom: 20px;
     position: relative;
     border-radius: 16px;
@@ -210,8 +230,12 @@ body {
     background: var(--card-bg);
     transform: translateZ(0);
     /* Fix for webkit rendering */
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.5s ease;
     cursor: zoom-in;
+}
+
+.gallery-item.opacity-0 {
+    opacity: 0;
 }
 
 .gallery-item:hover {
@@ -226,7 +250,6 @@ body {
     opacity: 0;
     /* Hidden initially for fade-in */
     transition: opacity 0.5s ease, transform 0.5s ease;
-    object-fit: cover;
     min-height: 150px; /* Reserve space to prevent layout shift */
 }
 
