@@ -3,7 +3,7 @@
 const CONFIG = {
     totalHorizontal: 882,
     totalVertical: 3289,
-    batchSize: 20, // 进一步减少批量加载数量，提升初始加载速度
+    batchSize: 30, // 增加批量加载数量，提前预加载更多图片
     pathH: '/ri/h/',
     pathV: '/ri/v/'
 };
@@ -16,8 +16,6 @@ let state = {
     currentMode: 'all', // 'all', 'h', 'v'
     isLoading: false,
     hasMore: true,
-    loadingImages: 0, // 当前正在加载的图片数量
-    maxConcurrentLoads: 30, // 增加并发加载数量，提升加载速度
     columns: [], // 瀑布流列元素
     columnHeights: [] // 每列的当前高度
 };
@@ -36,11 +34,8 @@ const dom = {
 // --- Initialization ---
 
 function init() {
-    console.log('Initializing...');
-    
     // 确保 DOM 元素存在
     if (!dom.grid) {
-        console.error('Gallery grid element not found');
         return;
     }
 
@@ -64,8 +59,6 @@ function init() {
 
     // Setup resize handler
     window.addEventListener('resize', handleResize);
-    
-    console.log('Initialization complete');
 }
 
 function setupScrollNavbar() {
@@ -125,7 +118,6 @@ function loadMoreImages() {
 
     // 确保列已经初始化
     if (state.columns.length === 0) {
-        console.error('Columns not initialized');
         initColumns();
     }
 
@@ -146,7 +138,9 @@ function loadMoreImages() {
     // 按行加载图片
     for (let i = 0; i < nextBatch.length; i++) {
         const imgData = nextBatch[i];
-        const item = createGalleryItem(imgData);
+        // 为初始加载的图片设置高优先级，确保它们优先加载
+        const isPriority = state.loadedCount < columnCount * 4; // 前四行图片优先加载，增加预加载数量
+        const item = createGalleryItem(imgData, isPriority);
         
         // 按顺序分配到列中，实现一行一行加载
         const columnIndex = i % columnCount;
@@ -157,7 +151,6 @@ function loadMoreImages() {
             // Update column height when image loads
             const img = item.querySelector('img');
             img.onload = function() {
-                state.loadingImages--;
                 item.classList.add('loaded');
                 
                 // Update column height
@@ -170,7 +163,6 @@ function loadMoreImages() {
             };
 
             img.onerror = function() {
-                state.loadingImages--;
                 // Even if image fails to load, mark as loaded to remove placeholder
                 item.classList.add('loaded');
                 item.classList.remove('opacity-0');
@@ -185,7 +177,7 @@ function loadMoreImages() {
                 state.columnHeights[columnIndex] = column.offsetHeight;
             };
         } else {
-            console.error('Column not found at index:', columnIndex);
+            // Column not found, skip
         }
     }
 
@@ -217,28 +209,19 @@ function loadMoreImages() {
     }
 }
 
-function createGalleryItem(data) {
+function createGalleryItem(data, isPriority = false) {
     const div = document.createElement('div');
     div.className = 'gallery-item opacity-0'; // 初始隐藏，用于淡入效果
 
     const img = document.createElement('img');
-    img.loading = 'lazy'; // Native lazy loading
+    // 为优先加载的图片设置更高的加载优先级
+    img.loading = isPriority ? 'eager' : 'lazy'; // 视口内的图片立即加载
+    img.fetchpriority = isPriority ? 'high' : 'auto'; // 视口内的图片设置高优先级
     img.decoding = 'async'; // 异步解码，提升性能
     img.alt = `Gallery Image ${data.type.toUpperCase()} ${data.id}`;
 
-    // 控制并发加载
-    const loadImage = () => {
-        if (state.loadingImages < state.maxConcurrentLoads) {
-            state.loadingImages++;
-            img.src = data.url;
-        } else {
-            // 等待更短的时间后重试，提升加载速度
-            setTimeout(loadImage, 50);
-        }
-    };
-    
-    // 立即尝试加载
-    loadImage();
+    // 直接设置 src，让浏览器自己处理懒加载
+    img.src = data.url;
 
     // Overlay
     const overlay = document.createElement('div');
@@ -340,7 +323,6 @@ function initColumns() {
 
     // Determine number of columns based on screen width
     const columnCount = getColumnCount();
-    console.log('Creating', columnCount, 'columns');
 
     // Create columns
     for (let i = 0; i < columnCount; i++) {
@@ -349,14 +331,11 @@ function initColumns() {
         dom.grid.appendChild(column);
         state.columns.push(column);
         state.columnHeights.push(0);
-        console.log('Created column', i);
     }
-    console.log('Columns created:', state.columns.length);
 }
 
 function getColumnCount() {
     const width = window.innerWidth;
-    console.log('Window width:', width);
     if (width >= 1600) return 5;
     if (width >= 1200) return 4;
     if (width >= 800) return 3;
@@ -405,8 +384,6 @@ function setupInfiniteScroll() {
 }
 
 // Run
-console.log('Script loaded');
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOMContentLoaded event fired');
     init();
 });
