@@ -3,7 +3,7 @@
 const CONFIG = {
     totalHorizontal: 882,
     totalVertical: 3289,
-    batchSize: 30, // 增加批量加载数量，提前预加载更多图片
+    batchSize: 60, // 进一步增加批量加载数量，确保加载更多图片
     pathH: '/ri/h/',
     pathV: '/ri/v/'
 };
@@ -139,7 +139,7 @@ function loadMoreImages() {
     for (let i = 0; i < nextBatch.length; i++) {
         const imgData = nextBatch[i];
         // 为初始加载的图片设置高优先级，确保它们优先加载
-        const isPriority = state.loadedCount < columnCount * 4; // 前四行图片优先加载，增加预加载数量
+        const isPriority = state.loadedCount < columnCount * 6; // 前六行图片优先加载，增加预加载数量
         const item = createGalleryItem(imgData, isPriority);
         
         // 按顺序分配到列中，实现一行一行加载
@@ -202,7 +202,7 @@ function loadMoreImages() {
     // 如果还有更多图片且加载器可见，继续加载
     if (state.hasMore) {
         const rect = dom.loader.getBoundingClientRect();
-        if (rect.top < window.innerHeight + 600) {
+        if (rect.top < window.innerHeight + 2000) { // 大幅增加预加载距离，提前加载更多图片
             // 使用 setTimeout 避免堆栈过深，并允许 UI 刷新
             setTimeout(() => loadMoreImages(), 50);
         }
@@ -219,6 +219,9 @@ function createGalleryItem(data, isPriority = false) {
     img.fetchpriority = isPriority ? 'high' : 'auto'; // 视口内的图片设置高优先级
     img.decoding = 'async'; // 异步解码，提升性能
     img.alt = `Gallery Image ${data.type.toUpperCase()} ${data.id}`;
+
+    // 为图片添加缓存控制
+    img.crossOrigin = 'anonymous'; // 允许跨域缓存
 
     // 直接设置 src，让浏览器自己处理懒加载
     img.src = data.url;
